@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 import numpy
 from tabulate import tabulate
 
+#Flow Condition
 
 #Sim Controls-----------------------------------------------------------------
 panel = int(300)
-reynolds_number = int(1000000)
-mach_number = 0.2
+reynolds_number = int(5153748)
+mach_number = 0.3
 number_itterations = int(200)
 ncrit = 3
 file_name = "airfoil_data_optimized.csv"
@@ -18,12 +19,12 @@ file_name_for_normalized = "Normalized_Data.csv"
 file_name_for_scored = "Airfoil_Scores.csv"
 
 #Airfoil Configuration Range-------------------------------------------------
-camber_min = 2
+camber_min = 1
 camber_max = 3
 camber_location_min= 3
-camber_location_max = 4
-thickness_min = 13
-thickness_max = 14
+camber_location_max = 5
+thickness_min = 12
+thickness_max = 15
 
 #Objective Weights------------------------------------------------------------
 cl_W = 0.16
@@ -35,7 +36,7 @@ AoAmarg_W = 0.17
 W_Total = int(cl_W + cd_W + LD_W + cm_W + tc_W + AoAmarg_W)
 
 #Ideal Values---------------------------------------------------------------
-ideal_tc = 14
+ideal_tc = 13
 deviation_tc = 5
 
 # Functions #====================================================================================#
@@ -138,8 +139,8 @@ QUIT
                 #Store Data as csv
                 store_data(airfoil_name,final_data)
 
-                with open("Sim_Configuration.txt","r") as config:
-                    config.write(f"{airfoil_name}: {final_data}")
+                with open("Sim_Configuration.txt","a") as config:
+                    config.write(f"{airfoil_name}: {final_data}\n")
 
     return airfoil_name,final_data
 
@@ -206,70 +207,6 @@ def read_and_write_normalized_file():
             except Exception as e:
                 print(f"ERROR: {e}")
 #--Score Calculate
-def apply_weights(cl_W,cd_W,LD_W,cm_W,tc_W,AoAmarg_W):
-    with open(file_name_for_normalized, "r") as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        new_fieldnames = fieldnames + ["Total Score", "Rank"]
-
-        rows = []
-        for row in reader:
-            row["Cl"] = float(row["Cl"]) * cl_W
-            row["Cd"] = float(row["Cd"]) * cd_W
-            row["L/Dmax"] = float(row["L/Dmax"]) * LD_W
-            row["Cm"] = float(row["Cm"]) * cm_W
-            row["t/c"] = float(row["t/c"]) * tc_W
-            row["AoA_margin"] = float(row["AoA_margin"]) * AoAmarg_W
-
-            score_sum = (
-                row["Cl"] + row["Cd"] + row["L/Dmax"]
-                + row["Cm"] + row["t/c"] + row["AoA_margin"]
-            )
-            row["Total Score"] = round(score_sum, 4)
-            rows.append(row)
-
-    # Sort all rows
-    rows.sort(key=lambda x: x["Total Score"], reverse=True)
-
-    for i, row in enumerate(rows, start=1):
-        row["Rank"] = i
-
-    #write all sorted and ranked rows
-    with open(file_name_for_scored, "w", newline='') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=new_fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    return rows[0]
-
-#--Plot
-def plot(x,y,title,label,marker,filename, color):
-    plt.plot(x,y, label = f"{label}", marker = f"{marker}", color = color)
-
-    plt.grid(
-    which='major',          
-    color='gray',           
-    linestyle='--',         
-    linewidth=0.5,         
-    alpha=0.7              
-)
-
-    plt.title(f"{title}",fontdict={'family':'rockwell', 'weight': 'bold'})
-    plt.legend(loc = 'best')
-    plt.savefig(filename, dpi=300, bbox_inches='tight') 
-    plt.close()
-
-def plot_subplot(ax,x,y,title,label,marker,color):
-    ax.plot(x,y,label = label, marker = marker, color = color)
-    ax.set_title(f"{title}",fontdict={'family':'rockwell',})
-
-    ax.grid(
-    which='major',          
-    color='gray',           
-    linestyle='--',        
-    linewidth=0.5,         
-    alpha=0.7               
-)
-    ax.legend(loc = 'best')
 
 #Print Sim Controls and Save #==========================================================================================#
 if W_Total == 1:
@@ -302,12 +239,13 @@ Sim Controls
     W_Total:               {W_Total*100}%
 -------------------------------------------------
 Airfoil Configuration Range (NACA 4_digits [camber, camber_loc, thickness])
-    camber_min =           {camber_min}
-    camber_max =           {camber_max}
-    camber_location_min=   {camber_location_min}
-    camber_location_max =  {camber_location_max}
-    thickness_min =        {thickness_min}
-    thickness_max =        {thickness_max}
+    camber_min :           {camber_min}
+    camber_max :           {camber_max}
+    camber_location_min :  {camber_location_min}
+    camber_location_max :  {camber_location_max}
+    thickness_min :        {thickness_min}
+    thickness_max :        {thickness_max}
+    Total Airfoils:        {(camber_max-camber_min + 1)*(camber_location_max-camber_location_min + 1)*(thickness_max-thickness_min + 1 )}
 -------------------------------------------------
 Ideal Thickness: {ideal_tc}
 Deviation:       {deviation_tc}
@@ -351,81 +289,6 @@ Normalize Data
 #Normalize the Datas and make it a new File--------------------
 read_and_write_normalized_file()
 #Make a new file for the weight application and Summation and sort---------------------
-best_row = apply_weights(cl_W,cd_W,LD_W,cm_W,tc_W,AoAmarg_W)
-
-#Print the Best Candidate #====================================================================
-data = [list(best_row.values())]
-header = list(best_row.keys())
-print(tabulate(data, headers = header, floatfmt = ".4f", tablefmt = "fancy_grid"))
-
-#------------------------------------------------------------------------------
-
-with open(f"{best_row["Airfoil"]}.txt","r") as f:
-    cl_list = []
-    cd_list = []
-    alpha_list = []
-    LD_list = []
-    cm_list = []
-    stall_trigger = False
-    post_stall_error = False
-
-    lines = f.readlines()
-    for i in range(len(lines)-1):
-
-        token = lines[i].strip().split()
-        next_token = lines[i+1].split()
-        if len(token) == 7 and len(next_token) == 7:
-            try:
-                alpha = float(token[0])
-                cl = float(token[1])
-                cd = float(token[2])
-                cm = float(token[4])
-                LD = cl/cd
-                next_cl = float(next_token[1])
-
-                if stall_trigger == False and post_stall_error == False:
-                    alpha_list.append(alpha)
-                    cl_list.append(cl)
-                    cd_list.append(cd)
-                    cm_list.append(cm)
-                    LD_list.append(LD)
-                    if cl >= next_cl:
-                        stall_triggerr = True
-                elif stall_trigger == True and post_stall_error == False:
-                    alpha_list.append(alpha)
-                    cl_list.append(cl)
-                    cd_list.append(cd)
-                    cm_list.append(cm)
-                    LD_list.append(LD)
-                    if cl < next_cl:
-                        post_stall_error = True
-                else:
-                    break
-            except ValueError:
-                continue
-
-
-plt.style.use('classic')
-
-plot(alpha_list,cl_list,"Cl vs Alpha",best_row["Airfoil"],"o","Cl vs Alpha.png", "blue")
-plot(alpha_list,cd_list,"Cd vs Alpha",best_row["Airfoil"],"p", "Cd vs Alpha.png", "red")
-plot(alpha_list,LD_list,"Lift/Drag vs Alpha",best_row["Airfoil"],"^", "LD vs Alpha.png", "green")
-plot(alpha_list,cm_list,"Cm vs Alpha",best_row["Airfoil"],"d", "Cm vs Alpha.png", "indigo")
-
-
-fig, axs = plt.subplots(2,2, figsize=(12, 8))
-fig.suptitle(f"{best_row['Airfoil']} Performance Charts",
-             fontdict={'family': 'rockwell'}, fontweight = 'bold', fontsize = 20)
-
-axs = axs.flatten()
-
-plot_subplot(axs[0],alpha_list,cl_list,"Cl vs Alpha",best_row["Airfoil"],"o","blue")
-plot_subplot(axs[1],alpha_list,cd_list,"Cd vs Alpha",best_row["Airfoil"],"p","red")
-plot_subplot(axs[2],alpha_list,LD_list,"Lift/Drag vs Alpha",best_row["Airfoil"],"^", "green")
-plot_subplot(axs[3],alpha_list,cm_list,"Cm vs Alpha",best_row["Airfoil"],"d", "indigo")
-
-plt.tight_layout()
-plt.show()
 
 print(f"""
 ==============================================================================================
